@@ -3,3 +3,4 @@ wandb
 outputs
 data/celeba
 __pycahe__
+**/__pycache__/
