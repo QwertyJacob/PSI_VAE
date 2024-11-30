@@ -1,0 +1,7 @@
+torch>=2.5.1
+matplotlib
+gdown>=5.2.0
+torchvision>=0.20.1
+deeplake>=4.0.3
+tqdm>=4.67.1
+wandb>=0.18.7

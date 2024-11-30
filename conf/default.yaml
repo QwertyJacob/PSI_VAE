@@ -1,0 +1,33 @@
+# Placeholder for overriding configurations at runtime.
+# This is useful when you want to pass specific parameters dynamically 
+# without editing this file directly.
+override: ""
+
+# The size of the "latent space" in the Variational Autoencoder (VAE).
+# This is where the VAE compresses the input data to a smaller representation.
+# A higher value means more capacity to capture data details but also more complexity.
+latent_dim: 64
+
+# Number of images to process in one batch during training.
+# Larger batch sizes use more memory but can train models faster.
+# Smaller batch sizes allow for finer updates to the model but take longer to train.
+batch_size: 64
+
+# The total number of times the model sees the entire dataset during training.
+# A higher number generally improves performance but takes longer to train.
+epochs: 100
+
+# The speed at which the model updates its knowledge during training.
+# Smaller values lead to slower, more stable training.
+# Larger values might train faster but risk overshooting the best solution.
+learning_rate: 0.0002
+
+# Specifies the hardware to use for training:
+# - "cuda" for training on a GPU (faster for large datasets/models).
+# - "cpu" for training on a CPU (slower but works without a GPU).
+device: cuda
+
+# Whether to enable Weights & Biases (WandB) for tracking experiments.
+# If True, this will log metrics and training progress to WandB for visualization.
+# Set to False if you don't want to use or install WandB.
+wandb: True
