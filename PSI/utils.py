@@ -8,6 +8,8 @@ import deeplake
 from torchvision.datasets import ImageFolder
 import wandb
 from tqdm import trange, tqdm
+from torchmetrics.image.fid import FrechetInceptionDistance
+
 
 def init_wandb(cfg):
     wandb.init(
@@ -16,28 +18,21 @@ def init_wandb(cfg):
         config=dict(cfg))
 
 
-def get_manual_dataloader(batch_size):
+def get_manual_dataloaders(batch_size):
     transform = transforms.Compose([
         transforms.CenterCrop(178),  # Crop face region
         transforms.Resize(64),  # Resize to 64x64
         transforms.ToTensor(),
     ])
     dataset = ImageFolder(root="./data/celeba", transform=transform)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    train_size = int(0.8 * len(dataset))
+    test_size = len(dataset) - train_size
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
 
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
-# Load and preprocess CelebA dataset
-def get_dataloader(batch_size):
-    transform = transforms.Compose([
-        transforms.CenterCrop(178),  # Crop out the face region
-        transforms.Resize(64),  # Resize to 64x64
-        transforms.ToTensor(),
-    ])
-    
-    dataset = datasets.CelebA(root="./data/celeba", download=False, transform=transform)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True)
-
-    return dataloader
+    return train_dataloader, test_dataloader
 
 
 # Loss function
@@ -48,14 +43,16 @@ def loss_function(recon_x, x, mu, logvar):
 
 
 # Training loop
-def train_vae(model, dataloader, optimizer, epochs, device, wb):
+def train_vae(model, train_dataloader, test_dataloader, optimizer, epochs, device, wb):
     model.to(device)
     step = 0
+    fid = FrechetInceptionDistance(feature=2048).to(device)  # Using 2048 for better accuracy
+
     for epoch in range(epochs):
         print(f"Epoch {epoch + 1}/{epochs}")
         model.train()
         train_loss = 0
-        for x, _ in tqdm(dataloader):
+        for x, _ in tqdm(train_dataloader):
             step += 1
             x = x.to(device)
             optimizer.zero_grad()
@@ -67,10 +64,45 @@ def train_vae(model, dataloader, optimizer, epochs, device, wb):
             optimizer.step()
 
             if step % 500 == 0:
-                visualize_reconstructions(model, dataloader, device, step, wb)
+                visualize_reconstructions(model, train_dataloader, device, step, wb)
+                
+        print(f"Epoch {epoch + 1}, Loss: {train_loss / len(train_dataloader.dataset):.4f}")
+        
+        compute_fid(fid, model, test_dataloader, device, step)
 
-        print(f"Epoch {epoch + 1}, Loss: {train_loss / len(dataloader.dataset):.4f}")
-        visualize_reconstructions(model, dataloader, device, step, wb)
+
+def compute_fid(fid, model, test_dataloader, device, step):
+    # FID computation
+    model.eval()
+    with torch.no_grad():
+        fid.reset()  # Clear previous calculations
+        real_images = []
+        fake_images = []
+
+        print('Validation...')
+        
+        # Collect real and fake images
+        for real_batch, _ in tqdm(test_dataloader):
+            real_batch = real_batch.to(device)
+            real_images.append(real_batch)
+            
+            fake_batch, _, _ = model(real_batch)  # Generate fake images
+            fake_images.append(fake_batch)
+
+            # Stop collecting after enough samples
+            if len(real_images) > 10:  # Adjust this number for more accuracy
+                break
+
+        # Add images to FID metric
+        for real, fake in zip(real_images, fake_images):
+            fid.update(real, real=True)
+            fid.update(fake, real=False)
+
+        # Compute FID score
+        fid_score = fid.compute().item()
+        print(f"FID Score after Epoch {epoch + 1}: {fid_score:.4f}")
+        wandb.log({"FID": fid_score}, step=step)
+
 
 
 # Visualize reconstructions

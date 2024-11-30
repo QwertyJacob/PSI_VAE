@@ -1,7 +1,7 @@
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 import torch.optim as optim
-from PSI.utils import train_vae, get_dataloader, get_manual_dataloader, init_wandb
+from PSI.utils import train_vae, get_manual_dataloaders, init_wandb
 from PSI.models import VAE
 import torch
 
@@ -26,11 +26,11 @@ def main(cfg: DictConfig):
     device = torch.device(cfg.device)
     wb = cfg.wandb
     
-    dataloader = get_manual_dataloader(batch_size)
+    train_dataloader, test_dataloader = get_manual_dataloaders(batch_size)
     vae = VAE(latent_dim)
     optimizer = optim.Adam(vae.parameters(), lr=learning_rate)
     init_wandb(cfg)
-    train_vae(vae, dataloader, optimizer, epochs, device, wb)
+    train_vae(vae, train_dataloader, test_dataloader, optimizer, epochs, device, wb)
 
 if __name__ == "__main__":
     main()
