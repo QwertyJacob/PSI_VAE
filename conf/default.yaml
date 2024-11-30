@@ -15,7 +15,7 @@ batch_size: 64
 
 # The total number of times the model sees the entire dataset during training.
 # A higher number generally improves performance but takes longer to train.
-epochs: 100
+epochs: 20
 
 # The speed at which the model updates its knowledge during training.
 # Smaller values lead to slower, more stable training.
@@ -31,3 +31,7 @@ device: cuda
 # If True, this will log metrics and training progress to WandB for visualization.
 # Set to False if you don't want to use or install WandB.
 wandb: True
+
+
+# Run name for the wandb logging run.
+name: ""

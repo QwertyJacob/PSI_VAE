@@ -1,5 +1,3 @@
 # We've got some 80GB A100 babies in the lab...
-latent_dim: 1024
 batch_size: 128
 device: cuda
-wandb: False

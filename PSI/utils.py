@@ -15,7 +15,9 @@ def init_wandb(cfg):
     wandb.init(
         project="VAE", 
         mode=("online" if cfg.wandb else "disabled"), 
-        config=dict(cfg))
+        config=dict(cfg),
+        name=(cfg.name if cfg.name != "" else None),
+    )
 
 
 def get_manual_dataloaders(batch_size):
@@ -65,10 +67,11 @@ def train_vae(model, train_dataloader, test_dataloader, optimizer, epochs, devic
 
             if step % 500 == 0:
                 visualize_reconstructions(model, train_dataloader, device, step, wb)
+                compute_fid(fid, model, test_dataloader, device, step)
+
                 
         print(f"Epoch {epoch + 1}, Loss: {train_loss / len(train_dataloader.dataset):.4f}")
         
-        compute_fid(fid, model, test_dataloader, device, step)
 
 
 def compute_fid(fid, model, test_dataloader, device, step):
@@ -84,13 +87,16 @@ def compute_fid(fid, model, test_dataloader, device, step):
         # Collect real and fake images
         for real_batch, _ in tqdm(test_dataloader):
             real_batch = real_batch.to(device)
+            # Denormalize real images (assuming normalized to [0, 1])
+            real_batch = (real_batch * 255).clamp(0, 255).to(torch.uint8)
             real_images.append(real_batch)
             
-            fake_batch, _, _ = model(real_batch)  # Generate fake images
+            fake_batch, _, _ = model(real_batch / 255.0)  # Re-normalize for the model
+            fake_batch = (fake_batch * 255).clamp(0, 255).to(torch.uint8)  # Denormalize
             fake_images.append(fake_batch)
 
             # Stop collecting after enough samples
-            if len(real_images) > 10:  # Adjust this number for more accuracy
+            if len(real_images) > 50:  # Adjust this number for more accuracy
                 break
 
         # Add images to FID metric
@@ -100,7 +106,7 @@ def compute_fid(fid, model, test_dataloader, device, step):
 
         # Compute FID score
         fid_score = fid.compute().item()
-        print(f"FID Score after Epoch {epoch + 1}: {fid_score:.4f}")
+        print(f"FID at step {step}: {fid_score:.4f}")
         wandb.log({"FID": fid_score}, step=step)
 
 
@@ -123,7 +129,7 @@ def visualize_reconstructions(model, dataloader, device, step, wb):
 
     plt.tight_layout()
 
-    if wb: wandb.log({f"Reconstructions": wandb.Image(plt)}, step=step, commit=False)
+    if wb: wandb.log({f"Reconstructions": wandb.Image(plt)}, step=step)
     else: plt.show()
 
     plt.cla()
